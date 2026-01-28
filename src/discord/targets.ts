@@ -5,9 +5,8 @@ import {
   type MessagingTarget,
   type MessagingTargetKind,
   type MessagingTargetParseOptions,
-  type DirectoryConfigParams,
-  type ChannelDirectoryEntry,
 } from "../channels/targets.js";
+import type { DirectoryConfigParams } from "../channels/plugins/directory-config.js";
 
 import { listDiscordDirectoryPeersLive } from "./directory-live.js";
 import { resolveDiscordAccount } from "./accounts.js";
@@ -82,7 +81,7 @@ export async function resolveDiscordTarget(
   if (!trimmed) return undefined;
 
   // If already a known format, parse directly
-  const directParse = parseDiscordTarget(trimmed, options);
+  const directParse = parseDiscordTarget(trimmed);
   if (directParse && directParse.kind !== "channel" && !isLikelyUsername(trimmed)) {
     return directParse;
   }
@@ -107,7 +106,7 @@ export async function resolveDiscordTarget(
   }
 
   // Fallback to original parsing (for channels, etc.)
-  return parseDiscordTarget(trimmed, options);
+  return parseDiscordTarget(trimmed);
 }
 
 /**
