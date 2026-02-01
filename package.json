@@ -204,6 +204,7 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@dqbd/tiktoken": "^1.0.22",
     "@grammyjs/types": "^3.23.0",
     "@lit-labs/signals": "^0.2.0",
     "@lit/context": "^1.1.6",

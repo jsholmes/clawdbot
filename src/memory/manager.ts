@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { get_encoding } from "@dqbd/tiktoken";
 import chokidar, { type FSWatcher } from "chokidar";
 import { randomUUID } from "node:crypto";
 import fsSync from "node:fs";
@@ -93,9 +94,56 @@ const VECTOR_TABLE = "chunks_vec";
 const FTS_TABLE = "chunks_fts";
 const EMBEDDING_CACHE_TABLE = "embedding_cache";
 const SESSION_DIRTY_DEBOUNCE_MS = 5000;
-const EMBEDDING_BATCH_MAX_TOKENS = 8000;
+// Keep some headroom below provider hard limits.
+// NOTE: OpenAI's embeddings endpoint appears to enforce a hard cap that can be hit by the
+// *combined* token count of a batch request. Use conservative heuristics.
+const EMBEDDING_BATCH_MAX_TOKENS = 6000;
+
+// Conservative heuristic used for batching and safety checks.
+// We intentionally over-estimate tokens (treat 1 char ~= 1 token) to avoid 8192-token failures.
 const EMBEDDING_APPROX_CHARS_PER_TOKEN = 1;
+
+// Hard guardrail: if a single embedding input looks too large (or too "dense"),
+// truncate it rather than repeatedly failing the entire memory sync.
+const EMBEDDING_MAX_INPUT_EST_TOKENS = 7800;
 const EMBEDDING_INDEX_CONCURRENCY = 4;
+
+// OpenAI embedding models enforce a hard per-input token limit.
+// (text-embedding-3-small currently errors at >8192 tokens.)
+const OPENAI_EMBEDDING_MAX_INPUT_TOKENS = 8192;
+
+let cl100k: ReturnType<typeof get_encoding> | null = null;
+const getCl100k = () => {
+  if (!cl100k) cl100k = get_encoding("cl100k_base");
+  return cl100k;
+};
+
+const countCl100kTokens = (text: string): number => {
+  if (!text) return 0;
+  return getCl100k().encode(text).length;
+};
+
+const truncateToCl100kTokenLimit = (text: string, limit: number): string => {
+  if (!text) return text;
+  if (countCl100kTokens(text) <= limit) return text;
+
+  // Binary search on prefix length. Token count is monotonic with prefix length.
+  let lo = 0;
+  let hi = text.length;
+  let best = 0;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const sub = text.slice(0, mid);
+    const tokens = countCl100kTokens(sub);
+    if (tokens <= limit) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return text.slice(0, best);
+};
 const EMBEDDING_RETRY_MAX_ATTEMPTS = 3;
 const EMBEDDING_RETRY_BASE_DELAY_MS = 500;
 const EMBEDDING_RETRY_MAX_DELAY_MS = 8000;
@@ -1595,10 +1643,33 @@ export class MemoryIndexManager {
   }
 
   private normalizeSessionText(value: string): string {
-    return value
+    // Session JSONL may include inline file/attachment dumps (e.g. a binary blob pasted into a
+    // message). Those can be extremely token-dense and can blow up embedding requests.
+    let v = value.replace(/<file\b[^>]*>[\s\S]*?<\/file>/gi, " [file omitted] ");
+
+    // Collapse whitespace to keep chunks compact.
+    v = v
       .replace(/\s*\n+\s*/g, " ")
       .replace(/\s+/g, " ")
       .trim();
+    if (!v) return "";
+
+    // Heuristic: drop obviously-binary / control-heavy strings to avoid embedding token explosions.
+    // Only apply to larger strings to avoid false positives.
+    if (v.length >= 1000) {
+      const control = (v.match(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g) ?? []).length;
+      const replacement = (v.match(/\uFFFD/g) ?? []).length;
+      const weird = (v.match(/[^\p{L}\p{N}\p{P}\p{Zs}\t]/gu) ?? []).length;
+      const total = v.length;
+      if ((control + replacement) / total > 0.02) return "";
+      if ((control + replacement + weird) / total > 0.35) return "";
+    }
+
+    // Cap extremely long messages.
+    const maxChars = EMBEDDING_MAX_INPUT_EST_TOKENS * EMBEDDING_APPROX_CHARS_PER_TOKEN;
+    if (v.length > maxChars) v = v.slice(0, maxChars);
+
+    return v;
   }
 
   private extractSessionText(content: unknown): string | null {
@@ -1845,7 +1916,23 @@ export class MemoryIndexManager {
     const toCache: Array<{ hash: string; embedding: number[] }> = [];
     let cursor = 0;
     for (const batch of batches) {
-      const batchEmbeddings = await this.embedBatchWithRetry(batch.map((chunk) => chunk.text));
+      const texts = batch.map((chunk) => {
+        let text = chunk.text;
+
+        // Hard safety for OpenAI: enforce 8192 tokens per input using the real tokenizer.
+        // (The limit comes from OpenAI's embeddings endpoint errors.)
+        if (this.provider.id === "openai") {
+          text = truncateToCl100kTokenLimit(text, OPENAI_EMBEDDING_MAX_INPUT_TOKENS);
+          return text;
+        }
+
+        // Best-effort fallback for other providers (heuristic).
+        const est = this.estimateEmbeddingTokens(text);
+        if (est <= EMBEDDING_MAX_INPUT_EST_TOKENS) return text;
+        const maxChars = EMBEDDING_MAX_INPUT_EST_TOKENS * EMBEDDING_APPROX_CHARS_PER_TOKEN;
+        return text.slice(0, Math.max(1, maxChars));
+      });
+      const batchEmbeddings = await this.embedBatchWithRetry(texts);
       for (let i = 0; i < batch.length; i += 1) {
         const item = missing[cursor + i];
         const embedding = batchEmbeddings[i] ?? [];

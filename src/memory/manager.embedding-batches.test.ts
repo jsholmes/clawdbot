@@ -1,17 +1,25 @@
+import { get_encoding } from "@dqbd/tiktoken";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getMemorySearchManager, type MemoryIndexManager } from "./index.js";
 
 const embedBatch = vi.fn(async (texts: string[]) => texts.map(() => [0, 1, 0]));
 const embedQuery = vi.fn(async () => [0, 1, 0]);
 
+const enc = get_encoding("cl100k_base");
+const countTokens = (text: string) => enc.encode(text).length;
+
+afterAll(() => {
+  enc.free();
+});
+
 vi.mock("./embeddings.js", () => ({
   createEmbeddingProvider: async () => ({
     requestedProvider: "openai",
     provider: {
-      id: "mock",
+      id: "openai",
       model: "mock-embed",
       embedQuery,
       embedBatch,
@@ -269,6 +277,67 @@ describe("memory embedding batches", () => {
 
     expect(calls).toBe(3);
   }, 10000);
+
+  it("truncates token-dense chunks to stay within embedding model limits", async () => {
+    // Real tokenizer (cl100k_base) reproducer: create a string that is *just barely* above 8192 tokens.
+    const tokenLimit = 8192;
+    const unit = "Ω"; // token-dense under cl100k_base (2 tokens per 1 code unit)
+    const unitTokens = countTokens(unit);
+    expect(unitTokens).toBeGreaterThan(1);
+
+    const n = Math.floor(tokenLimit / unitTokens) + 1;
+    const tokenDense = unit.repeat(n);
+    const tokenCount = countTokens(tokenDense);
+    expect(tokenCount).toBeGreaterThan(tokenLimit);
+    expect(tokenCount - tokenLimit).toBeLessThanOrEqual(unitTokens);
+
+    await fs.writeFile(path.join(workspaceDir, "memory", "2026-01-09.md"), tokenDense);
+
+    // Stub the embedder (no network). Enforce the same per-input token limit as OpenAI would.
+    embedBatch.mockImplementation(async (texts: string[]) => {
+      for (const t of texts) {
+        const tokens = countTokens(t);
+        if (tokens > tokenLimit) {
+          throw new Error(
+            `openai embeddings failed: 400 {"error":{"message":"This model's maximum context length is 8192 tokens, however you requested ${tokens} tokens (${tokens} in your prompt; 0 for the completion)."}}`,
+          );
+        }
+      }
+      return texts.map(() => [0, 1, 0]);
+    });
+
+    const cfg = {
+      agents: {
+        defaults: {
+          workspace: workspaceDir,
+          memorySearch: {
+            provider: "openai",
+            model: "mock-embed",
+            store: { path: indexPath },
+            // Ensure our token-dense string stays in a single chunk so we reproduce the bug.
+            chunking: { tokens: 2000, overlap: 0 },
+            sync: { watch: false, onSessionStart: false, onSearch: false },
+            query: { minScore: 0 },
+          },
+        },
+        list: [{ id: "main", default: true }],
+      },
+    };
+
+    const result = await getMemorySearchManager({ cfg, agentId: "main" });
+    expect(result.manager).not.toBeNull();
+    if (!result.manager) throw new Error("manager missing");
+    manager = result.manager;
+
+    // Desired behavior: the manager should shrink content (using real token counting) and succeed.
+    await expect(manager.sync({ force: true })).resolves.toBeUndefined();
+
+    const inputs = embedBatch.mock.calls.flatMap((call) => call[0] ?? []);
+    expect(inputs.length).toBeGreaterThan(0);
+    for (const t of inputs) {
+      expect(countTokens(t)).toBeLessThanOrEqual(tokenLimit);
+    }
+  });
 
   it("skips empty chunks so embeddings input stays valid", async () => {
     await fs.writeFile(path.join(workspaceDir, "memory", "2026-01-07.md"), "\n\n\n");
