@@ -105,18 +105,26 @@ const OPENAI_EMBEDDING_MAX_INPUT_TOKENS = 8192;
 
 let cl100k: ReturnType<typeof get_encoding> | null = null;
 const getCl100k = () => {
-  if (!cl100k) cl100k = get_encoding("cl100k_base");
+  if (!cl100k) {
+    cl100k = get_encoding("cl100k_base");
+  }
   return cl100k;
 };
 
 const countCl100kTokens = (text: string): number => {
-  if (!text) return 0;
+  if (!text) {
+    return 0;
+  }
   return getCl100k().encode(text).length;
 };
 
 const truncateToCl100kTokenLimit = (text: string, limit: number): string => {
-  if (!text) return text;
-  if (countCl100kTokens(text) <= limit) return text;
+  if (!text) {
+    return text;
+  }
+  if (countCl100kTokens(text) <= limit) {
+    return text;
+  }
 
   // Binary search on prefix length. Token count is monotonic with prefix length.
   let lo = 0;
@@ -1611,22 +1619,40 @@ export class MemoryIndexManager implements MemorySearchManager {
       .replace(/\s*\n+\s*/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-    if (!v) return "";
+    if (!v) {
+      return "";
+    }
 
     // Heuristic: drop obviously-binary / control-heavy strings to avoid embedding token explosions.
     // Only apply to larger strings to avoid false positives.
     if (v.length >= 1000) {
-      const control = (v.match(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g) ?? []).length;
+      // Control chars regex: NUL-BS, VT, FF, SO-US, DEL
+      // Build from char codes to avoid linter complaints about control char literals
+      const ctrlChars = [
+        ...Array.from({ length: 9 }, (_, i) => String.fromCharCode(i)), // 0x00-0x08
+        String.fromCharCode(0x0b),
+        String.fromCharCode(0x0c), // VT, FF
+        ...Array.from({ length: 18 }, (_, i) => String.fromCharCode(0x0e + i)), // 0x0E-0x1F
+        String.fromCharCode(0x7f), // DEL
+      ].join("");
+      const controlRe = new RegExp(`[${ctrlChars}]`, "g");
+      const control = (v.match(controlRe) ?? []).length;
       const replacement = (v.match(/\uFFFD/g) ?? []).length;
       const weird = (v.match(/[^\p{L}\p{N}\p{P}\p{Zs}\t]/gu) ?? []).length;
       const total = v.length;
-      if ((control + replacement) / total > 0.02) return "";
-      if ((control + replacement + weird) / total > 0.35) return "";
+      if ((control + replacement) / total > 0.02) {
+        return "";
+      }
+      if ((control + replacement + weird) / total > 0.35) {
+        return "";
+      }
     }
 
     // Cap extremely long messages.
     const maxChars = EMBEDDING_MAX_INPUT_EST_TOKENS * EMBEDDING_APPROX_CHARS_PER_TOKEN;
-    if (v.length > maxChars) v = v.slice(0, maxChars);
+    if (v.length > maxChars) {
+      v = v.slice(0, maxChars);
+    }
 
     return v;
   }
@@ -1887,7 +1913,9 @@ export class MemoryIndexManager implements MemorySearchManager {
 
         // Best-effort fallback for other providers (heuristic).
         const est = this.estimateEmbeddingTokens(text);
-        if (est <= EMBEDDING_MAX_INPUT_EST_TOKENS) return text;
+        if (est <= EMBEDDING_MAX_INPUT_EST_TOKENS) {
+          return text;
+        }
         const maxChars = EMBEDDING_MAX_INPUT_EST_TOKENS * EMBEDDING_APPROX_CHARS_PER_TOKEN;
         return text.slice(0, Math.max(1, maxChars));
       });

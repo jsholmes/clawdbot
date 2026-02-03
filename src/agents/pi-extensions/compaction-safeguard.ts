@@ -17,6 +17,8 @@ const FALLBACK_SUMMARY =
 const TURN_PREFIX_INSTRUCTIONS =
   "This summary covers the prefix of a split turn. Focus on the original request," +
   " early progress, and any details needed to understand the retained suffix.";
+const DEFAULT_COMPACTION_INSTRUCTIONS =
+  "Also preserve any pending questions or decisions the assistant asked that are awaiting user response.";
 const MAX_TOOL_FAILURES = 8;
 const MAX_TOOL_FAILURE_CHARS = 240;
 
@@ -160,7 +162,10 @@ function formatFileOperations(readFiles: string[], modifiedFiles: string[]): str
 
 export default function compactionSafeguardExtension(api: ExtensionAPI): void {
   api.on("session_before_compact", async (event, ctx) => {
-    const { preparation, customInstructions, signal } = event;
+    const { preparation, customInstructions: eventCustomInstructions, signal } = event;
+    // Use default instructions for auto-compaction (when customInstructions is undefined)
+    // to preserve pending questions/decisions that might otherwise be lost
+    const customInstructions = eventCustomInstructions ?? DEFAULT_COMPACTION_INSTRUCTIONS;
     const { readFiles, modifiedFiles } = computeFileLists(preparation.fileOps);
     const fileOpsSummary = formatFileOperations(readFiles, modifiedFiles);
     const toolFailures = collectToolFailures([
