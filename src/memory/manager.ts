@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { get_encoding } from "@dqbd/tiktoken";
 import chokidar, { type FSWatcher } from "chokidar";
 import { randomUUID } from "node:crypto";
 import fsSync from "node:fs";
@@ -97,6 +98,43 @@ const EMBEDDING_QUERY_TIMEOUT_REMOTE_MS = 60_000;
 const EMBEDDING_QUERY_TIMEOUT_LOCAL_MS = 5 * 60_000;
 const EMBEDDING_BATCH_TIMEOUT_REMOTE_MS = 2 * 60_000;
 const EMBEDDING_BATCH_TIMEOUT_LOCAL_MS = 10 * 60_000;
+
+// OpenAI embedding models enforce a hard per-input token limit.
+// (text-embedding-3-small currently errors at >8192 tokens.)
+const OPENAI_EMBEDDING_MAX_INPUT_TOKENS = 8192;
+
+let cl100k: ReturnType<typeof get_encoding> | null = null;
+const getCl100k = () => {
+  if (!cl100k) cl100k = get_encoding("cl100k_base");
+  return cl100k;
+};
+
+const countCl100kTokens = (text: string): number => {
+  if (!text) return 0;
+  return getCl100k().encode(text).length;
+};
+
+const truncateToCl100kTokenLimit = (text: string, limit: number): string => {
+  if (!text) return text;
+  if (countCl100kTokens(text) <= limit) return text;
+
+  // Binary search on prefix length. Token count is monotonic with prefix length.
+  let lo = 0;
+  let hi = text.length;
+  let best = 0;
+  while (lo <= hi) {
+    const mid = Math.floor((lo + hi) / 2);
+    const sub = text.slice(0, mid);
+    const tokens = countCl100kTokens(sub);
+    if (tokens <= limit) {
+      best = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return text.slice(0, best);
+};
 
 const log = createSubsystemLogger("memory");
 
@@ -1804,7 +1842,13 @@ export class MemoryIndexManager implements MemorySearchManager {
     const toCache: Array<{ hash: string; embedding: number[] }> = [];
     let cursor = 0;
     for (const batch of batches) {
-      const batchEmbeddings = await this.embedBatchWithRetry(batch.map((chunk) => chunk.text));
+      const batchEmbeddings = await this.embedBatchWithRetry(
+        batch.map((chunk) =>
+          this.provider.id === "openai"
+            ? truncateToCl100kTokenLimit(chunk.text, OPENAI_EMBEDDING_MAX_INPUT_TOKENS)
+            : chunk.text,
+        ),
+      );
       for (let i = 0; i < batch.length; i += 1) {
         const item = missing[cursor + i];
         const embedding = batchEmbeddings[i] ?? [];
@@ -1912,7 +1956,7 @@ export class MemoryIndexManager implements MemorySearchManager {
         url: OPENAI_BATCH_ENDPOINT,
         body: {
           model: this.openAi?.model ?? this.provider.model,
-          input: chunk.text,
+          input: truncateToCl100kTokenLimit(chunk.text, OPENAI_EMBEDDING_MAX_INPUT_TOKENS),
         },
       });
     }
