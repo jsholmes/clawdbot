@@ -1,9 +1,8 @@
+import { get_encoding } from "@dqbd/tiktoken";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { get_encoding } from "@dqbd/tiktoken";
 import { getMemorySearchManager, type MemoryIndexManager } from "./index.js";
 
 const embedBatch = vi.fn(async (texts: string[]) => texts.map(() => [0, 1, 0]));

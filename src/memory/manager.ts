@@ -1,4 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
+import { get_encoding } from "@dqbd/tiktoken";
 import chokidar, { type FSWatcher } from "chokidar";
 import { randomUUID } from "node:crypto";
 import fsSync from "node:fs";
@@ -52,8 +53,6 @@ import { searchKeyword, searchVector } from "./manager-search.js";
 import { ensureMemoryIndexSchema } from "./memory-schema.js";
 import { loadSqliteVecExtension } from "./sqlite-vec.js";
 import { requireNodeSqlite } from "./sqlite.js";
-
-import { get_encoding } from "@dqbd/tiktoken";
 
 type MemoryIndexMeta = {
   model: string;

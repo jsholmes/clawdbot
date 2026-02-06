@@ -1,6 +1,6 @@
 import type { HeartbeatStatus, SessionStatus, StatusSummary } from "./status.types.js";
-import { lookupContextTokens } from "../agents/context.js";
 import { resolveAgentModelPrimary } from "../agents/agent-scope.js";
+import { lookupContextTokens } from "../agents/context.js";
 import { DEFAULT_CONTEXT_TOKENS, DEFAULT_MODEL, DEFAULT_PROVIDER } from "../agents/defaults.js";
 import { parseModelRef, resolveConfiguredModelRef } from "../agents/model-selection.js";
 import { loadConfig } from "../config/config.js";
