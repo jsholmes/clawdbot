@@ -26,6 +26,7 @@ type SessionRow = {
   outputTokens?: number;
   totalTokens?: number;
   model?: string;
+  modelOverride?: string;
   contextTokens?: number;
 };
 
@@ -155,6 +156,7 @@ function toRows(store: Record<string, SessionEntry>): SessionRow[] {
         outputTokens: entry?.outputTokens,
         totalTokens: entry?.totalTokens,
         model: entry?.model,
+        modelOverride: entry?.modelOverride,
         contextTokens: entry?.contextTokens,
       } satisfies SessionRow;
     })
@@ -207,12 +209,20 @@ export async function sessionsCommand(
           path: storePath,
           count: rows.length,
           activeMinutes: activeMinutes ?? null,
-          sessions: rows.map((r) => ({
-            ...r,
-            contextTokens:
-              r.contextTokens ?? lookupContextTokens(r.model) ?? configContextTokens ?? null,
-            model: r.model ?? configModel ?? null,
-          })),
+          sessions: rows.map((r) => {
+            const effectiveModel = r.modelOverride ?? r.model ?? configModel ?? null;
+            const modelChanged = r.modelOverride && r.model && r.modelOverride !== r.model;
+            return {
+              ...r,
+              contextTokens: modelChanged
+                ? (lookupContextTokens(effectiveModel) ??
+                  r.contextTokens ??
+                  configContextTokens ??
+                  null)
+                : (r.contextTokens ?? lookupContextTokens(r.model) ?? configContextTokens ?? null),
+              model: r.model ?? configModel ?? null,
+            };
+          }),
         },
         null,
         2,
@@ -244,8 +254,12 @@ export async function sessionsCommand(
   runtime.log(rich ? theme.heading(header) : header);
 
   for (const row of rows) {
+    const effectiveModel = row.modelOverride ?? row.model ?? configModel;
     const model = row.model ?? configModel;
-    const contextTokens = row.contextTokens ?? lookupContextTokens(model) ?? configContextTokens;
+    const modelChanged = row.modelOverride && row.model && row.modelOverride !== row.model;
+    const contextTokens = modelChanged
+      ? (lookupContextTokens(effectiveModel) ?? row.contextTokens ?? configContextTokens)
+      : (row.contextTokens ?? lookupContextTokens(model) ?? configContextTokens);
     const input = row.inputTokens ?? 0;
     const output = row.outputTokens ?? 0;
     const total = row.totalTokens ?? input + output;

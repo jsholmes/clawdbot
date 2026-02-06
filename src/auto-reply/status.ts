@@ -320,11 +320,18 @@ export function buildStatusMessage(args: StatusArgs): string {
   });
   const provider = entry?.providerOverride ?? resolved.provider ?? DEFAULT_PROVIDER;
   let model = entry?.modelOverride ?? resolved.model ?? DEFAULT_MODEL;
-  let contextTokens =
-    entry?.contextTokens ??
-    args.agent?.contextTokens ??
-    lookupContextTokens(model) ??
-    DEFAULT_CONTEXT_TOKENS;
+  // When the effective model differs from the last-run model, the persisted
+  // contextTokens is stale (from the old model). Prefer a fresh lookup.
+  const modelChanged = entry?.modelOverride && entry.model && entry.modelOverride !== entry.model;
+  let contextTokens = modelChanged
+    ? (lookupContextTokens(model) ??
+      args.agent?.contextTokens ??
+      entry?.contextTokens ??
+      DEFAULT_CONTEXT_TOKENS)
+    : (entry?.contextTokens ??
+      args.agent?.contextTokens ??
+      lookupContextTokens(model) ??
+      DEFAULT_CONTEXT_TOKENS);
 
   let inputTokens = entry?.inputTokens;
   let outputTokens = entry?.outputTokens;

@@ -231,6 +231,29 @@ describe("buildStatusMessage", () => {
     expect(normalizeTestText(text)).toContain("Model: openai/gpt-4.1-mini");
   });
 
+  it("uses fresh context window when model override differs from last-run model", () => {
+    const text = buildStatusMessage({
+      agent: { model: "anthropic/claude-opus-4-5" },
+      sessionEntry: {
+        sessionId: "stale-ctx",
+        updatedAt: 0,
+        providerOverride: "anthropic",
+        modelOverride: "claude-opus-4-6",
+        model: "gpt-5.2",
+        modelProvider: "openai",
+        contextTokens: 400_000,
+      },
+      sessionKey: "agent:main:main",
+      sessionScope: "per-sender",
+      queue: { mode: "collect", depth: 0 },
+      modelAuth: "api-key",
+    });
+    const normalized = normalizeTestText(text);
+    // Should show 200k (DEFAULT_CONTEXT_TOKENS) NOT 400k (stale from GPT-5.2)
+    expect(normalized).toContain("Context: 0/200k");
+    expect(normalized).not.toContain("400k");
+  });
+
   it("keeps provider prefix from configured model", () => {
     const text = buildStatusMessage({
       agent: {

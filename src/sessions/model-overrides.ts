@@ -23,6 +23,7 @@ export function applyModelOverrideToSessionEntry(params: {
     }
     if (entry.modelOverride) {
       delete entry.modelOverride;
+      delete entry.contextTokens; // stale from overridden model; next run repopulates
       updated = true;
     }
   } else {
@@ -32,6 +33,7 @@ export function applyModelOverrideToSessionEntry(params: {
     }
     if (entry.modelOverride !== selection.model) {
       entry.modelOverride = selection.model;
+      delete entry.contextTokens; // stale from previous model; next run repopulates
       updated = true;
     }
   }
