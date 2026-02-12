@@ -87,6 +87,28 @@ describe("buildStatusMessage", () => {
     expect(normalized).toContain("Queue: collect");
   });
 
+  it("shows prompt breakdown when cache tokens are present", () => {
+    const text = buildStatusMessage({
+      agent: { model: "openai-codex/gpt-5.2", contextTokens: 400_000 },
+      sessionEntry: {
+        sessionId: "cache-1",
+        updatedAt: 0,
+        inputTokens: 12_000,
+        cacheReadTokens: 388_000,
+        cacheWriteTokens: 0,
+        promptTokens: 400_000,
+        totalTokens: 400_000,
+        contextTokens: 400_000,
+      },
+      sessionKey: "agent:main:main",
+      sessionScope: "per-sender",
+      queue: { mode: "collect", depth: 0 },
+      modelAuth: "oauth",
+    });
+    const normalized = normalizeTestText(text);
+    expect(normalized).toContain("Prompt: 400k (12k new + 388k cached)");
+  });
+
   it("uses per-agent sandbox config when config and session key are provided", () => {
     const text = buildStatusMessage({
       config: {

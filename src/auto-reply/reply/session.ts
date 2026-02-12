@@ -342,6 +342,10 @@ export async function initSessionState(params: {
     // display the old session's context usage after /new or /reset.
     sessionEntry.totalTokens = undefined;
     sessionEntry.inputTokens = undefined;
+    sessionEntry.cacheReadTokens = undefined;
+    sessionEntry.cacheWriteTokens = undefined;
+    sessionEntry.promptTokens = undefined;
+    sessionEntry.usageSnapshotAt = undefined;
     sessionEntry.outputTokens = undefined;
     sessionEntry.contextTokens = undefined;
   }

@@ -454,6 +454,14 @@ export function buildStatusMessage(args: StatusArgs): string {
   const costLine = costLabel ? `💵 Cost: ${costLabel}` : null;
   const usageCostLine =
     usagePair && costLine ? `${usagePair} · ${costLine}` : (usagePair ?? costLine);
+  const promptTokens = entry?.promptTokens;
+  const cacheReadTokens = entry?.cacheReadTokens;
+  const cacheWriteTokens = entry?.cacheWriteTokens;
+  const hasCache = (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0) > 0;
+  const promptLine =
+    hasCache && typeof promptTokens === "number"
+      ? `🧮 Prompt: ${formatTokenCount(promptTokens)} (${formatTokenCount(entry?.inputTokens ?? 0)} new + ${formatTokenCount((cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0))} cached)`
+      : null;
   const mediaLine = formatMediaUnderstandingLine(args.mediaDecisions);
   const voiceLine = formatVoiceModeLine(args.config, args.sessionEntry);
 
@@ -462,6 +470,7 @@ export function buildStatusMessage(args: StatusArgs): string {
     args.timeLine,
     modelLine,
     usageCostLine,
+    promptLine,
     `📚 ${contextLine}`,
     mediaLine,
     args.usageLine,

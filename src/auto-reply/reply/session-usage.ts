@@ -1,5 +1,6 @@
 import { setCliSessionId } from "../../agents/cli-session.js";
 import {
+  derivePromptTokens,
   deriveSessionTotalTokens,
   hasNonzeroUsage,
   type NormalizedUsage,
@@ -36,9 +37,16 @@ export async function persistSessionUsageUpdate(params: {
         update: async (entry) => {
           const input = params.usage?.input ?? 0;
           const output = params.usage?.output ?? 0;
+          const cacheRead = params.usage?.cacheRead ?? 0;
+          const cacheWrite = params.usage?.cacheWrite ?? 0;
+          const promptTokens = derivePromptTokens({ input, cacheRead, cacheWrite });
           const resolvedContextTokens = params.contextTokensUsed ?? entry.contextTokens;
           const patch: Partial<SessionEntry> = {
             inputTokens: input,
+            cacheReadTokens: cacheRead || undefined,
+            cacheWriteTokens: cacheWrite || undefined,
+            promptTokens: promptTokens ?? undefined,
+            usageSnapshotAt: Date.now(),
             outputTokens: output,
             totalTokens:
               deriveSessionTotalTokens({

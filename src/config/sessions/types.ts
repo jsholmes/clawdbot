@@ -70,6 +70,10 @@ export type SessionEntry = {
   inputTokens?: number;
   outputTokens?: number;
   totalTokens?: number;
+  cacheReadTokens?: number;
+  cacheWriteTokens?: number;
+  promptTokens?: number;
+  usageSnapshotAt?: number;
   modelProvider?: string;
   model?: string;
   contextTokens?: number;
