@@ -371,7 +371,12 @@ export function createSessionStatusTool(opts?: {
       }
 
       const agentDir = resolveAgentDir(cfg, agentId);
-      const providerForCard = resolved.entry.providerOverride?.trim() || configured.provider;
+      // Status card should label auth using the effective provider.
+      // providerOverride is explicit; otherwise prefer last-run modelProvider.
+      const providerForCard =
+        resolved.entry.providerOverride?.trim() ||
+        resolved.entry.modelProvider?.trim() ||
+        configured.provider;
       const usageProvider = resolveUsageProviderId(providerForCard);
       let usageLine: string | undefined;
       if (usageProvider) {
