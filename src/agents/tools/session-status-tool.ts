@@ -460,7 +460,7 @@ export function createSessionStatusTool(opts?: {
           dropPolicy: queueSettings.dropPolicy,
           showDetails: queueOverrides,
         },
-        includeTranscriptUsage: false,
+        includeTranscriptUsage: true,
       });
 
       return {
