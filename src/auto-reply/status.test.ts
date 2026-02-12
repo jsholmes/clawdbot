@@ -231,6 +231,27 @@ describe("buildStatusMessage", () => {
     expect(normalizeTestText(text)).toContain("Model: openai/gpt-4.1-mini");
   });
 
+  it("uses effective last-run model when no override is set", () => {
+    const text = buildStatusMessage({
+      agent: { model: "anthropic/claude-opus-4-6" },
+      sessionEntry: {
+        sessionId: "effective-1",
+        updatedAt: 0,
+        modelProvider: "openai",
+        model: "gpt-5.2",
+        contextTokens: 400_000,
+      },
+      sessionKey: "agent:main:main",
+      sessionScope: "per-sender",
+      queue: { mode: "collect", depth: 0 },
+      modelAuth: "api-key",
+    });
+
+    const normalized = normalizeTestText(text);
+    expect(normalized).toContain("Model: openai/gpt-5.2");
+    expect(normalized).toContain("Context: 0/400k");
+  });
+
   it("uses fresh context window when model override differs from last-run model", () => {
     const text = buildStatusMessage({
       agent: { model: "anthropic/claude-opus-4-5" },

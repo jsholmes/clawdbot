@@ -318,8 +318,9 @@ export function buildStatusMessage(args: StatusArgs): string {
     defaultProvider: DEFAULT_PROVIDER,
     defaultModel: DEFAULT_MODEL,
   });
-  const provider = entry?.providerOverride ?? resolved.provider ?? DEFAULT_PROVIDER;
-  let model = entry?.modelOverride ?? resolved.model ?? DEFAULT_MODEL;
+  const provider =
+    entry?.providerOverride ?? entry?.modelProvider ?? resolved.provider ?? DEFAULT_PROVIDER;
+  let model = entry?.modelOverride ?? entry?.model ?? resolved.model ?? DEFAULT_MODEL;
   // When the effective model differs from the last-run model, the persisted
   // contextTokens is stale (from the old model). Prefer a fresh lookup.
   const modelChanged = entry?.modelOverride && entry.model && entry.modelOverride !== entry.model;
