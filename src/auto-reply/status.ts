@@ -338,26 +338,45 @@ export function buildStatusMessage(args: StatusArgs): string {
   let outputTokens = entry?.outputTokens;
   let totalTokens = entry?.totalTokens ?? (entry?.inputTokens ?? 0) + (entry?.outputTokens ?? 0);
 
-  // Prefer prompt-size tokens from the session transcript when it looks larger
-  // (cached prompt tokens are often missing from agent meta/store).
+  // Prefer prompt-size tokens from the session transcript.
+  // Persisted totals can be stale (especially if previously clamped to the context window).
+  let transcriptUsage:
+    | {
+        input: number;
+        output: number;
+        promptTokens: number;
+        total: number;
+        model?: string;
+      }
+    | undefined;
   if (args.includeTranscriptUsage) {
-    const logUsage = readUsageFromSessionLog(entry?.sessionId, entry);
-    if (logUsage) {
-      const candidate = logUsage.promptTokens || logUsage.total;
-      if (!totalTokens || totalTokens === 0 || candidate > totalTokens) {
+    transcriptUsage = readUsageFromSessionLog(entry?.sessionId, entry);
+    if (transcriptUsage) {
+      const candidate = transcriptUsage.promptTokens || transcriptUsage.total;
+      const looksClamped =
+        typeof contextTokens === "number" &&
+        contextTokens > 0 &&
+        typeof totalTokens === "number" &&
+        totalTokens >= contextTokens;
+      if (
+        !totalTokens ||
+        totalTokens === 0 ||
+        candidate > totalTokens ||
+        (looksClamped && candidate < totalTokens)
+      ) {
         totalTokens = candidate;
       }
       if (!model) {
-        model = logUsage.model ?? model;
+        model = transcriptUsage.model ?? model;
       }
-      if (!contextTokens && logUsage.model) {
-        contextTokens = lookupContextTokens(logUsage.model) ?? contextTokens;
+      if (!contextTokens && transcriptUsage.model) {
+        contextTokens = lookupContextTokens(transcriptUsage.model) ?? contextTokens;
       }
       if (!inputTokens || inputTokens === 0) {
-        inputTokens = logUsage.input;
+        inputTokens = transcriptUsage.input;
       }
       if (!outputTokens || outputTokens === 0) {
-        outputTokens = logUsage.output;
+        outputTokens = transcriptUsage.output;
       }
     }
   }
@@ -454,14 +473,23 @@ export function buildStatusMessage(args: StatusArgs): string {
   const costLine = costLabel ? `💵 Cost: ${costLabel}` : null;
   const usageCostLine =
     usagePair && costLine ? `${usagePair} · ${costLine}` : (usagePair ?? costLine);
-  const promptTokens = entry?.promptTokens;
+  const promptTokens = entry?.promptTokens ?? transcriptUsage?.promptTokens;
   const cacheReadTokens = entry?.cacheReadTokens;
   const cacheWriteTokens = entry?.cacheWriteTokens;
-  const hasCache = (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0) > 0;
-  const promptLine =
-    hasCache && typeof promptTokens === "number"
-      ? `🧮 Prompt: ${formatTokenCount(promptTokens)} (${formatTokenCount(entry?.inputTokens ?? 0)} new + ${formatTokenCount((cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0))} cached)`
-      : null;
+  const cachedFromEntry = (cacheReadTokens ?? 0) + (cacheWriteTokens ?? 0);
+  const cachedFromTranscript =
+    typeof promptTokens === "number"
+      ? Math.max(0, promptTokens - (transcriptUsage?.input ?? entry?.inputTokens ?? 0))
+      : 0;
+  const useEntryCache = cachedFromEntry > 0;
+  const cachedTokens = useEntryCache ? cachedFromEntry : cachedFromTranscript;
+  const newTokens = useEntryCache
+    ? (entry?.inputTokens ?? 0)
+    : (transcriptUsage?.input ?? entry?.inputTokens ?? 0);
+  const hasCache = typeof promptTokens === "number" && cachedTokens > 0;
+  const promptLine = hasCache
+    ? `🧮 Prompt: ${formatTokenCount(promptTokens)} (${formatTokenCount(newTokens)} new + ${formatTokenCount(cachedTokens)} cached)`
+    : null;
   const mediaLine = formatMediaUnderstandingLine(args.mediaDecisions);
   const voiceLine = formatVoiceModeLine(args.config, args.sessionEntry);
 
