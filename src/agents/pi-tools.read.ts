@@ -1,5 +1,6 @@
 import type { AgentToolResult } from "@mariozechner/pi-agent-core";
 import { createEditTool, createReadTool, createWriteTool } from "@mariozechner/pi-coding-agent";
+import { Type } from "@sinclair/typebox";
 import { detectMime } from "../media/mime.js";
 import { sniffMimeFromBase64 } from "../media/sniff-mime-from-base64.js";
 import type { ImageSanitizationLimits } from "./image-sanitization.js";
@@ -7,6 +8,12 @@ import type { AnyAgentTool } from "./pi-tools.types.js";
 import { assertSandboxPath } from "./sandbox-paths.js";
 import type { SandboxFsBridge } from "./sandbox/fs-bridge.js";
 import { sanitizeToolResultImages } from "./tool-images.js";
+import {
+  EXCLUDED_CONTEXT_PREVIEW_CHARS,
+  formatExcludedFromContextHeader,
+  tailText,
+  writeToolOutputArtifact,
+} from "./tool-output-artifacts.js";
 
 // NOTE(steipete): Upstream read now does file-magic MIME detection; we keep the wrapper
 // to normalize payloads and sanitize oversized images before they hit providers.
@@ -600,6 +607,18 @@ export function createOpenClawReadTool(
   options?: OpenClawReadToolOptions,
 ): AnyAgentTool {
   const patched = patchToolSchemaForClaudeCompatibility(base);
+
+  // Patch schema to include excludeFromContext
+  const patchedSchema = patched.parameters as Record<string, unknown> | undefined;
+  if (patchedSchema?.properties && typeof patchedSchema.properties === "object") {
+    (patchedSchema.properties as Record<string, unknown>).excludeFromContext = Type.Optional(
+      Type.Boolean({
+        description:
+          "When true, save full output to an artifact file and return only a short preview to keep the session context small.",
+      }),
+    );
+  }
+
   return {
     ...patched,
     execute: async (toolCallId, params, signal) => {
@@ -608,21 +627,81 @@ export function createOpenClawReadTool(
         normalized ??
         (params && typeof params === "object" ? (params as Record<string, unknown>) : undefined);
       assertRequiredParams(record, CLAUDE_PARAM_GROUPS.read, base.name);
+      const excludeFromContext = record?.excludeFromContext === true;
+
+      // Strip excludeFromContext before passing to the base tool to avoid schema validation issues.
+      const args = (normalized ?? params ?? {}) as Record<string, unknown>;
+      const { excludeFromContext: _excludeFromContext, ...baseArgs } = args;
+
       const result = await executeReadWithAdaptivePaging({
         base,
         toolCallId,
-        args: (normalized ?? params ?? {}) as Record<string, unknown>,
+        args: baseArgs,
         signal,
         maxBytes: resolveAdaptiveReadMaxBytes(options),
       });
+
       const filePath = typeof record?.path === "string" ? String(record.path) : "<unknown>";
       const strippedDetailsResult = stripReadTruncationContentDetails(result);
       const normalizedResult = await normalizeReadImageResult(strippedDetailsResult, filePath);
-      return sanitizeToolResultImages(
+      const sanitized = await sanitizeToolResultImages(
         normalizedResult,
         `read:${filePath}`,
         options?.imageSanitization,
       );
+
+      if (!excludeFromContext) {
+        return sanitized;
+      }
+
+      // Collect content for the artifact — preserve non-text blocks as JSON.
+      const blocks = Array.isArray(sanitized.content) ? sanitized.content : [];
+      const hasNonText = blocks.some(
+        (b) => b && typeof b === "object" && (b as { type?: string }).type !== "text",
+      );
+
+      let artifactPayload: string;
+      let artifactExt: string;
+      if (hasNonText) {
+        artifactPayload = JSON.stringify(
+          { content: blocks, details: sanitized.details ?? null },
+          null,
+          2,
+        );
+        artifactExt = "json";
+      } else {
+        const textParts: string[] = [];
+        for (const block of blocks) {
+          if (block && typeof block === "object" && (block as { type?: string }).type === "text") {
+            textParts.push((block as { text: string }).text);
+          }
+        }
+        artifactPayload = textParts.join("\n");
+        artifactExt = "txt";
+      }
+
+      const artifactId = typeof toolCallId === "string" && toolCallId ? toolCallId : "read";
+      const outputFile = await writeToolOutputArtifact({
+        toolName: "read",
+        toolCallId: artifactId,
+        output: artifactPayload,
+        extension: artifactExt,
+      });
+
+      const previewText = hasNonText
+        ? `[contains non-text content — see artifact for full data]\n\n${tailText(artifactPayload, EXCLUDED_CONTEXT_PREVIEW_CHARS)}`
+        : tailText(artifactPayload, EXCLUDED_CONTEXT_PREVIEW_CHARS);
+      const header = formatExcludedFromContextHeader({ toolName: "read", outputFile });
+      const body = previewText || "(no output)";
+
+      return {
+        content: [{ type: "text" as const, text: `${header}\n\n${body}` }],
+        details: {
+          ...(sanitized.details && typeof sanitized.details === "object" ? sanitized.details : {}),
+          outputFile: outputFile ?? undefined,
+          excludedFromContext: true,
+        },
+      };
     },
   };
 }

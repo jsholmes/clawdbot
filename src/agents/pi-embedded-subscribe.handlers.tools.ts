@@ -19,6 +19,7 @@ import {
 } from "./pi-embedded-subscribe.tools.js";
 import { inferToolMetaFromArgs } from "./pi-embedded-utils.js";
 import { buildToolMutationState, isSameToolMutationAction } from "./tool-mutation.js";
+import { hardCapToolOutput } from "./tool-output-hard-cap.js";
 import { normalizeToolName } from "./tool-policy.js";
 
 /** Track tool execution start times and args for after_tool_call hook */
@@ -231,7 +232,7 @@ export function handleToolExecutionUpdate(
   const toolName = normalizeToolName(String(evt.toolName));
   const toolCallId = String(evt.toolCallId);
   const partial = evt.partialResult;
-  const sanitized = sanitizeToolResult(partial);
+  const sanitized = hardCapToolOutput(sanitizeToolResult(partial));
   emitAgentEvent({
     runId: ctx.params.runId,
     stream: "tool",
@@ -353,7 +354,7 @@ export async function handleToolExecutionEnd(
       toolCallId,
       meta,
       isError: isToolError,
-      result: sanitizedResult,
+      result: hardCapToolOutput(sanitizedResult),
     },
   });
   void ctx.params.onAgentEvent?.({
