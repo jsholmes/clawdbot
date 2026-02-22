@@ -3,9 +3,9 @@ import path from "node:path";
 import type { Command } from "commander";
 import type { GatewayAuthMode, GatewayTailscaleMode } from "../../config/config.js";
 import {
-  CONFIG_PATH,
   loadConfig,
   readConfigFileSnapshot,
+  resolveConfigPathCandidate,
   resolveStateDir,
   resolveGatewayPort,
 } from "../../config/config.js";
@@ -206,7 +206,10 @@ async function runGatewayCommand(opts: GatewayRunOpts) {
   const tokenRaw = toOptionString(opts.token);
 
   const snapshot = await readConfigFileSnapshot().catch(() => null);
-  const configExists = snapshot?.exists ?? fs.existsSync(CONFIG_PATH);
+  // Avoid module-scope CONFIG_PATH constant here: in --dev mode, env vars are
+  // set at runtime and this fallback should resolve the active candidate path.
+  const configExists =
+    snapshot?.exists ?? fs.existsSync(resolveConfigPathCandidate(process.env, os.homedir));
   const configAuditPath = path.join(resolveStateDir(process.env), "logs", "config-audit.jsonl");
   const mode = cfg.gateway?.mode;
   if (!opts.allowUnconfigured && mode !== "local") {
