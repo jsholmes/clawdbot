@@ -14,7 +14,12 @@ export type ResolvedDiscordAccount = {
   config: DiscordAccountConfig;
 };
 
-const { listAccountIds, resolveDefaultAccountId } = createAccountListHelpers("discord");
+const { listAccountIds, resolveDefaultAccountId } = createAccountListHelpers("discord", {
+  hasDefaultToken: (cfg) => {
+    const { token } = resolveDiscordToken(cfg, {});
+    return !!token;
+  },
+});
 export const listDiscordAccountIds = listAccountIds;
 export const resolveDefaultDiscordAccountId = resolveDefaultAccountId;
 
