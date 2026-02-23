@@ -12,6 +12,8 @@ RUN set -eux; \
     ca-certificates \
     curl \
     git \
+    python3 \
+    build-essential \
     sudo \
   && rm -rf /var/lib/apt/lists/*
 

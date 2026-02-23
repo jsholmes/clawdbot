@@ -12,6 +12,9 @@ RUN set -eux; \
     ca-certificates \
     curl \
     sudo \
+    python3 \
+    build-essential \
+    git \
   && rm -rf /var/lib/apt/lists/*
 
 RUN useradd -m -s /bin/bash app \

@@ -6,6 +6,8 @@ RUN apt-get update \
     ca-certificates \
     curl \
     git \
+    python3 \
+    build-essential \
   && rm -rf /var/lib/apt/lists/*
 
 COPY run.sh /usr/local/bin/openclaw-install-e2e
