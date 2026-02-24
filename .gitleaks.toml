@@ -1,0 +1,19 @@
+# Gitleaks configuration — suppress known false positives in tests/docs while keeping default detection rules.
+# https://github.com/gitleaks/gitleaks#configuration
+
+title = "clawdbot gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Test fixtures, documentation examples, and baseline artifacts"
+paths = [
+  '''(^|/).*\.test\.(ts|js|mjs)$''',
+  '''(^|/).*\.spec\.(ts|js|mjs)$''',
+  '''(^|/)__tests__/''',
+  '''(^|/)__snapshots__/''',
+  '''(^|/)docs/''',
+  '''(^|/).*\.md$''',
+  '''(^|/)\.secrets\.baseline$''',
+]
