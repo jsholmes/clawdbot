@@ -383,6 +383,11 @@ describe("sessions tools", () => {
           key: targetKey,
         };
       }
+      if (request.method === "sessions.list") {
+        return {
+          sessions: [{ key: targetKey }],
+        };
+      }
       if (request.method === "chat.history") {
         return {
           messages: [{ role: "assistant", content: [{ type: "text", text: "ok" }] }],
@@ -481,6 +486,9 @@ describe("sessions tools", () => {
     callGatewayMock.mockImplementation(async (opts: unknown) => {
       const request = opts as { method?: string; params?: unknown };
       calls.push(request);
+      if (request.method === "sessions.list") {
+        return { sessions: [{ key: "main" }] };
+      }
       if (request.method === "agent") {
         agentCallCount += 1;
         const runId = `run-${agentCallCount}`;
@@ -545,6 +553,7 @@ describe("sessions tools", () => {
       message: "ping",
       timeoutSeconds: 0,
     });
+    // Allowed: target session is visible in this requester's spawned-session tree.
     expect(fire.details).toMatchObject({
       status: "accepted",
       runId: "run-1",
@@ -625,6 +634,9 @@ describe("sessions tools", () => {
       if (request.method === "sessions.resolve") {
         return { key: targetKey };
       }
+      if (request.method === "sessions.list") {
+        return { sessions: [{ key: targetKey }] };
+      }
       if (request.method === "agent") {
         return { runId: "run-1", acceptedAt: 123 };
       }
@@ -652,6 +664,7 @@ describe("sessions tools", () => {
       timeoutSeconds: 0,
     });
     const details = result.details as { status?: string };
+    // Allowed: resolved target key is in spawned-session visibility for this requester.
     expect(details.status).toBe("accepted");
     const agentCall = callGatewayMock.mock.calls.find(
       (call) => (call[0] as { method?: string }).method === "agent",
@@ -660,6 +673,38 @@ describe("sessions tools", () => {
       method: "agent",
       params: { sessionKey: targetKey },
     });
+  });
+
+  it("sessions_send forbids targets outside the visible session tree", async () => {
+    callGatewayMock.mockReset();
+    const requesterKey = "discord:group:req";
+    const hiddenTarget = "discord:group:hidden";
+    callGatewayMock.mockImplementation(async (opts: unknown) => {
+      const request = opts as { method?: string };
+      if (request.method === "sessions.list") {
+        return { sessions: [{ key: "discord:group:other" }] };
+      }
+      return {};
+    });
+
+    const tool = createOpenClawTools({
+      agentSessionKey: requesterKey,
+      agentChannel: "discord",
+    }).find((candidate) => candidate.name === "sessions_send");
+    expect(tool).toBeDefined();
+    if (!tool) {
+      throw new Error("missing sessions_send tool");
+    }
+
+    const result = await tool.execute("call7-forbidden", {
+      sessionKey: hiddenTarget,
+      message: "ping",
+      timeoutSeconds: 0,
+    });
+    const details = result.details as { status?: string; error?: string };
+    // Forbidden: visibility=tree allows only self/spawned sessions, and this target is neither.
+    expect(details.status).toBe("forbidden");
+    expect(details.error).toContain("visibility is restricted");
   });
 
   it("sessions_send runs ping-pong then announces", async () => {
@@ -674,6 +719,9 @@ describe("sessions tools", () => {
     callGatewayMock.mockImplementation(async (opts: unknown) => {
       const request = opts as { method?: string; params?: unknown };
       calls.push(request);
+      if (request.method === "sessions.list") {
+        return { sessions: [{ key: targetKey }] };
+      }
       if (request.method === "agent") {
         agentCallCount += 1;
         const runId = `run-${agentCallCount}`;

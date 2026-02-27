@@ -293,7 +293,7 @@ describe("web_search external content wrapping", () => {
 
     // URL should NOT be wrapped - kept raw for tool chaining (e.g., web_fetch)
     expect(details.results?.[0]?.url).toBe(url);
-    expect(details.results?.[0]?.url).not.toContain("<<<EXTERNAL_UNTRUSTED_CONTENT>>>");
+    expect(details.results?.[0]?.url).not.toMatch(/<<<EXTERNAL_UNTRUSTED_CONTENT\b/);
   });
 
   it("does not wrap Brave site names", async () => {
@@ -307,7 +307,7 @@ describe("web_search external content wrapping", () => {
     const details = result?.details as { results?: Array<{ siteName?: string }> };
 
     expect(details.results?.[0]?.siteName).toBe("example.com");
-    expect(details.results?.[0]?.siteName).not.toContain("<<<EXTERNAL_UNTRUSTED_CONTENT>>>");
+    expect(details.results?.[0]?.siteName).not.toMatch(/<<<EXTERNAL_UNTRUSTED_CONTENT\b/);
   });
 
   it("does not wrap Brave published ages", async () => {
@@ -322,7 +322,7 @@ describe("web_search external content wrapping", () => {
     const details = result?.details as { results?: Array<{ published?: string }> };
 
     expect(details.results?.[0]?.published).toBe("2 days ago");
-    expect(details.results?.[0]?.published).not.toContain("<<<EXTERNAL_UNTRUSTED_CONTENT>>>");
+    expect(details.results?.[0]?.published).not.toMatch(/<<<EXTERNAL_UNTRUSTED_CONTENT\b/);
   });
 
   it("wraps Perplexity content", async () => {
@@ -350,6 +350,6 @@ describe("web_search external content wrapping", () => {
 
     // Citations are URLs - should NOT be wrapped for tool chaining
     expect(details.citations?.[0]).toBe(citation);
-    expect(details.citations?.[0]).not.toContain("<<<EXTERNAL_UNTRUSTED_CONTENT>>>");
+    expect(details.citations?.[0]).not.toMatch(/<<<EXTERNAL_UNTRUSTED_CONTENT\b/);
   });
 });

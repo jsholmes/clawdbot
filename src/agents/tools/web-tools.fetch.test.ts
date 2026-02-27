@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as ssrf from "../../infra/net/ssrf.js";
+import { expectExternalWrapper } from "../../test-utils/expect-external-wrapper.js";
 import { createWebFetchTool } from "./web-tools.js";
 
 type MockResponse = {
@@ -145,8 +146,11 @@ describe("web_fetch extraction fallbacks", () => {
       externalContent?: { untrusted?: boolean; source?: string; wrapped?: boolean };
     };
 
-    expect(details.text).toContain("<<<EXTERNAL_UNTRUSTED_CONTENT>>>");
-    expect(details.text).toContain("Ignore previous instructions");
+    expectExternalWrapper({
+      output: details.text,
+      source: "Web Fetch",
+      payload: "Ignore previous instructions",
+    });
     expect(details.externalContent).toMatchObject({
       untrusted: true,
       source: "web_fetch",
@@ -401,8 +405,11 @@ describe("web_fetch extraction fallbacks", () => {
       maxChars: 200_000,
     });
     const details = result?.details as { text?: string; length?: number; truncated?: boolean };
-    expect(details.text).toContain("<<<EXTERNAL_UNTRUSTED_CONTENT>>>");
-    expect(details.text).toContain("Source: Web Fetch");
+    expectExternalWrapper({
+      output: details.text,
+      source: "Web Fetch",
+      payload: "a".repeat(32),
+    });
     expect(details.length).toBeLessThanOrEqual(5_000);
     expect(details.truncated).toBe(true);
   });
@@ -437,9 +444,12 @@ describe("web_fetch extraction fallbacks", () => {
     }
 
     expect(message).toContain("Web fetch failed (404):");
-    expect(message).toContain("<<<EXTERNAL_UNTRUSTED_CONTENT>>>");
     expect(message).toContain("SECURITY NOTICE");
-    expect(message).toContain("Not Found");
+    expectExternalWrapper({
+      output: message,
+      source: "Web Fetch",
+      payload: "Not Found",
+    });
     expect(message).not.toContain("<html");
     expect(message.length).toBeLessThan(5_000);
   });
@@ -472,8 +482,11 @@ describe("web_fetch extraction fallbacks", () => {
     }
 
     expect(message).toContain("Web fetch failed (500):");
-    expect(message).toContain("<<<EXTERNAL_UNTRUSTED_CONTENT>>>");
-    expect(message).toContain("Oops");
+    expectExternalWrapper({
+      output: message,
+      source: "Web Fetch",
+      payload: "Oops",
+    });
   });
 
   it("wraps firecrawl error details", async () => {
@@ -510,7 +523,10 @@ describe("web_fetch extraction fallbacks", () => {
     }
 
     expect(message).toContain("Firecrawl fetch failed (403):");
-    expect(message).toContain("<<<EXTERNAL_UNTRUSTED_CONTENT>>>");
-    expect(message).toContain("blocked");
+    expectExternalWrapper({
+      output: message,
+      source: "Web Fetch",
+      payload: "blocked",
+    });
   });
 });

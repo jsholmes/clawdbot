@@ -5,14 +5,18 @@ import { describe, expect, it, vi } from "vitest";
 import "./test-helpers/fast-core-tools.js";
 import { createOpenClawTools } from "./openclaw-tools.js";
 
-vi.mock("./tools/gateway.js", () => ({
-  callGatewayTool: vi.fn(async (method: string) => {
-    if (method === "config.get") {
-      return { hash: "hash-1" };
-    }
-    return { ok: true };
-  }),
-}));
+vi.mock("./tools/gateway.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./tools/gateway.js")>();
+  return {
+    ...actual,
+    callGatewayTool: vi.fn(async (method: string) => {
+      if (method === "config.get") {
+        return { hash: "hash-1" };
+      }
+      return { ok: true };
+    }),
+  };
+});
 
 describe("gateway tool", () => {
   it("schedules SIGUSR1 restart", async () => {

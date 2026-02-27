@@ -17,6 +17,7 @@ const makeCtx = () =>
       toolSummaryById: new Set<string>(),
       lastToolError: undefined as unknown,
       pendingMessagingTexts: new Map<string, string>(),
+      pendingMessagingMediaUrls: new Map<string, string[]>(),
       pendingMessagingTargets: new Map<string, unknown>(),
       messagingToolSentTexts: [] as string[],
       messagingToolSentTextsNormalized: [] as string[],

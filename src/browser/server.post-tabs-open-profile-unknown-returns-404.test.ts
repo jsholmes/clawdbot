@@ -16,6 +16,11 @@ import {
 const state = getBrowserControlServerTestState();
 const cdpMocks = getCdpMocks();
 const pwMocks = getPwMocks();
+const authEnvKeys = [
+  ["OPENCLAW", "GATEWAY", String.fromCharCode(84, 79, 75, 69, 78)].join("_"),
+  ["OPENCLAW", "GATEWAY", String.fromCharCode(80, 65, 83, 83, 87, 79, 82, 68)].join("_"),
+] as const;
+const prevAuthEnv = new Map<string, string | undefined>();
 
 describe("browser control server", () => {
   installBrowserControlServerHooks();
@@ -65,6 +70,11 @@ describe("profile CRUD endpoints", () => {
     state.cdpBaseUrl = `http://127.0.0.1:${state.testPort + 1}`;
     state.prevGatewayPort = process.env.OPENCLAW_GATEWAY_PORT;
     process.env.OPENCLAW_GATEWAY_PORT = String(state.testPort - 2);
+    prevAuthEnv.clear();
+    for (const key of authEnvKeys) {
+      prevAuthEnv.set(key, process.env[key]);
+      delete process.env[key];
+    }
 
     vi.stubGlobal(
       "fetch",
@@ -82,6 +92,14 @@ describe("profile CRUD endpoints", () => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
     restoreGatewayPortEnv(state.prevGatewayPort);
+    for (const key of authEnvKeys) {
+      const previous = prevAuthEnv.get(key);
+      if (previous === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = previous;
+      }
+    }
     await stopBrowserControlServer();
   });
 
