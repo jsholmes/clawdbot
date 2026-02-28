@@ -143,6 +143,12 @@ export async function searchKeyword(params: {
   sourceFilter: { sql: string; params: SearchSource[] };
   buildFtsQuery: (raw: string) => string | null;
   bm25RankToScore: (rank: number) => number;
+  /**
+   * Optional fallback query builder (e.g. OR-join) used when the primary
+   * AND-join query returns no rows. Improves recall for queries where not
+   * all tokens appear in a single chunk.
+   */
+  buildFtsFallbackQuery?: (raw: string) => string | null;
 }): Promise<Array<SearchRowResult & { textScore: number }>> {
   if (params.limit <= 0) {
     return [];
@@ -156,24 +162,36 @@ export async function searchKeyword(params: {
   const modelClause = params.providerModel ? " AND model = ?" : "";
   const modelParams = params.providerModel ? [params.providerModel] : [];
 
-  const rows = params.db
-    .prepare(
-      `SELECT id, path, source, start_line, end_line, text,\n` +
-        `       bm25(${params.ftsTable}) AS rank\n` +
-        `  FROM ${params.ftsTable}\n` +
-        ` WHERE ${params.ftsTable} MATCH ?${modelClause}${params.sourceFilter.sql}\n` +
-        ` ORDER BY rank ASC\n` +
-        ` LIMIT ?`,
-    )
-    .all(ftsQuery, ...modelParams, ...params.sourceFilter.params, params.limit) as Array<{
-    id: string;
-    path: string;
-    source: SearchSource;
-    start_line: number;
-    end_line: number;
-    text: string;
-    rank: number;
-  }>;
+  const runQuery = (matchQuery: string) =>
+    params.db
+      .prepare(
+        `SELECT id, path, source, start_line, end_line, text,\n` +
+          `       bm25(${params.ftsTable}) AS rank\n` +
+          `  FROM ${params.ftsTable}\n` +
+          ` WHERE ${params.ftsTable} MATCH ?${modelClause}${params.sourceFilter.sql}\n` +
+          ` ORDER BY rank ASC\n` +
+          ` LIMIT ?`,
+      )
+      .all(matchQuery, ...modelParams, ...params.sourceFilter.params, params.limit) as Array<{
+      id: string;
+      path: string;
+      source: SearchSource;
+      start_line: number;
+      end_line: number;
+      text: string;
+      rank: number;
+    }>;
+
+  let rows = runQuery(ftsQuery);
+
+  // If the strict AND query returned nothing and a fallback builder is provided,
+  // retry with the looser OR query to improve recall for short-fact queries.
+  if (rows.length === 0 && params.buildFtsFallbackQuery) {
+    const fallbackQuery = params.buildFtsFallbackQuery(params.query);
+    if (fallbackQuery && fallbackQuery !== ftsQuery) {
+      rows = runQuery(fallbackQuery);
+    }
+  }
 
   return rows.map((row) => {
     const textScore = params.bm25RankToScore(row.rank);
