@@ -98,8 +98,8 @@ describe("redactSecrets", () => {
   });
 
   it("redacts Bearer tokens", () => {
-    expect(redactSecrets("Authorization: Bearer eyJhbGciOiJSUzI1NiJ9abc")).not.toContain(
-      "eyJhbGciOiJSUzI1NiJ9abc",
+    expect(redactSecrets("Authorization: Bearer EXAMPLE_BEARER_TOKEN_abc")).not.toContain(
+      "EXAMPLE_BEARER_TOKEN_abc",
     );
   });
 
@@ -108,8 +108,8 @@ describe("redactSecrets", () => {
   });
 
   it("redacts JWT tokens", () => {
-    expect(redactSecrets("token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test")).not.toContain(
-      "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
+    expect(redactSecrets("token: EXAMPLE_JWT_TOKEN.test")).not.toContain(
+      "EXAMPLE_JWT_TOKEN",
     );
   });
 
