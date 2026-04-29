@@ -60,6 +60,20 @@ Runs `BOOT.md` whenever the gateway starts (after channels start).
 openclaw hooks enable boot-md
 ```
 
+### 📬 missed-message-recovery
+
+Replays Discord messages that arrived while the gateway was restarting.
+
+**Events**: `gateway:startup` (shutdown timestamp captured via signal handlers)
+**What it does**: On shutdown records timestamp; on startup scans Discord channels for unreplied messages and replays them through the gateway WS interface.
+**Output**: `~/.openclaw/missed-message-recovery-state.json`
+
+**Enable**:
+
+```bash
+openclaw hooks enable missed-message-recovery
+```
+
 ## Hook Structure
 
 Each hook is a directory containing:
