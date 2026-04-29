@@ -126,8 +126,11 @@ export function getShellConfig(customShellPath?: string): ShellConfig {
   }
   // Placeholder SHELL (or unset): prefer a resolved sh/bash on PATH so we do not
   // re-invoke the placeholder and get a spurious exitCode=1.
-  const shell = resolveShellFromPath("sh") ?? resolveShellFromPath("bash") ?? "sh";
-  return { shell, args: getPosixShellArgs(shell) };
+  const shell = resolveShellFromPath("sh") ?? resolveShellFromPath("bash");
+  if (shell) {
+    return { shell, args: getPosixShellArgs(shell) };
+  }
+  return { shell: rawEnvShell ? "sh" : "/bin/sh", args: ["-c"] };
 }
 
 export function getBashShellConfig(customShellPath?: string): ShellConfig {

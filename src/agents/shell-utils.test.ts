@@ -100,11 +100,11 @@ describe("getShellConfig", () => {
     expect(args).toEqual(["--noprofile", "--norc", "-c"]);
   });
 
-  it("uses sh when SHELL is unset", () => {
+  it("uses absolute /bin/sh when SHELL is unset and PATH is empty", () => {
     delete process.env.SHELL;
     process.env.PATH = "";
     const { shell, args } = getShellConfig();
-    expect(shell).toBe("sh");
+    expect(shell).toBe("/bin/sh");
     expect(args).toEqual(["-c"]);
   });
 
