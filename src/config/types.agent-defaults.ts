@@ -44,8 +44,35 @@ export type AgentModelListConfig = {
   fallbacks?: string[];
 };
 
+export type OverflowRecoveryConfig = {
+  /** When false (default), overflow behaves exactly as before (session reset). */
+  enabled?: boolean;
+  /** Large-context model to use for summarisation (default: "gemini-3-flash-preview"). */
+  model?: string;
+  /** How many of the last user/assistant exchanges to preserve verbatim (default: 5). */
+  keepLastTurns?: number;
+  /** Hard cap on summary output length in chars (default: 50000). */
+  maxSummaryChars?: number;
+  /** Pre-truncation threshold in chars (default: 800000). */
+  maxInputChars?: number;
+  /** Timeout in ms before failing the distillation attempt (default: 30000). */
+  timeoutMs?: number;
+  /** Whether to notify the user with a "compressed history" message when used automatically. */
+  notifyUser?: boolean;
+  /** Minimum word target for the summary (default: 1000). */
+  minOutputWords?: number;
+  /** Run two LLM passes: enumerate then synthesise (default: true). */
+  twoPass?: boolean;
+  /** Model override for pass 1 (enumeration). Falls back to `model` if unset. */
+  pass1Model?: string;
+  /** Model override for pass 2 (synthesis). Falls back to `model` if unset. */
+  pass2Model?: string;
+};
+
 export type AgentContextPruningConfig = {
   mode?: "off" | "cache-ttl";
+  /** Emergency overflow recovery and manual distillation config. */
+  overflowRecovery?: OverflowRecoveryConfig;
   /** TTL to consider cache expired (duration string, default unit: minutes). */
   ttl?: string;
   keepLastAssistants?: number;

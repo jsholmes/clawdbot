@@ -129,6 +129,22 @@ export const AgentDefaultsSchema = z
         softTrimRatio: z.number().min(0).max(1).optional(),
         hardClearRatio: z.number().min(0).max(1).optional(),
         minPrunableToolChars: z.number().int().nonnegative().optional(),
+        overflowRecovery: z
+          .object({
+            enabled: z.boolean().optional(),
+            model: z.string().optional(),
+            keepLastTurns: z.number().int().nonnegative().optional(),
+            maxSummaryChars: z.number().int().positive().optional(),
+            maxInputChars: z.number().int().positive().optional(),
+            timeoutMs: z.number().int().positive().optional(),
+            notifyUser: z.boolean().optional(),
+            minOutputWords: z.number().int().positive().optional(),
+            twoPass: z.boolean().optional(),
+            pass1Model: z.string().optional(),
+            pass2Model: z.string().optional(),
+          })
+          .strict()
+          .optional(),
         tools: z
           .object({
             allow: z.array(z.string()).optional(),

@@ -47,6 +47,7 @@ function getReservedCommands(): Set<string> {
     "reset",
     "new",
     "compact",
+    "distill",
     "config",
     "debug",
     "allowlist",

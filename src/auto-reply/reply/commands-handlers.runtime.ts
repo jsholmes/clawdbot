@@ -8,6 +8,7 @@ import { handleConfigCommand, handleDebugCommand } from "./commands-config.js";
 import { handleContextCommand } from "./commands-context-command.js";
 import { handleCrestodianCommand } from "./commands-crestodian.js";
 import { handleDiagnosticsCommand } from "./commands-diagnostics.js";
+import { handleDistillCommand } from "./commands-distill.js";
 import { handleDockCommand } from "./commands-dock.js";
 import { handleGoalCommand } from "./commands-goal.js";
 import {
@@ -80,6 +81,7 @@ export function loadCommandHandlers(): CommandHandler[] {
     handleModelsCommand,
     handleStopCommand,
     handleCompactCommand,
+    handleDistillCommand,
     handleAbortTrigger,
   ];
 }

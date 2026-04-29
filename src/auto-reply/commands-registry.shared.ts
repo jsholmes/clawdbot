@@ -753,6 +753,23 @@ export function buildBuiltinChatCommands(
       ],
     }),
     defineChatCommand({
+      key: "distill",
+      nativeName: "distill",
+      description:
+        "Distill the current session into a summary file, optionally rewriting the session.",
+      textAlias: "/distill",
+      category: "session",
+      args: [
+        {
+          name: "mode",
+          description: "export (default) or compact",
+          type: "string",
+          choices: ["export", "compact"],
+        },
+      ],
+      argsMenu: "auto",
+    }),
+    defineChatCommand({
       key: "think",
       nativeName: "think",
       description: "Set thinking level.",
