@@ -8,6 +8,7 @@ function makeMessage(params: {
   timestampMs: number;
   content?: string;
   authorBot?: boolean;
+  type?: number;
   attachments?: Array<{
     id: string;
     url: string;
@@ -25,6 +26,7 @@ function makeMessage(params: {
     },
     timestamp: new Date(params.timestampMs).toISOString(),
     timestampMs: params.timestampMs,
+    ...(params.type === undefined ? {} : { type: params.type }),
   };
 }
 
@@ -122,6 +124,55 @@ describe("detectMissedMessages", () => {
     });
 
     expect(result).toEqual([]);
+  });
+
+  it("does not replay Discord thread-created system messages from parent channels", () => {
+    const messages = [
+      makeMessage({
+        id: "thread-created-stub",
+        authorId: "user-1",
+        timestampMs: 200,
+        content: "Screen / Avatar",
+        type: 18,
+      }),
+    ];
+
+    const result = detectMissedMessages({
+      messages,
+      shutdownAt: 100,
+      botId,
+      authorizedSenders,
+    });
+
+    expect(result).toEqual([]);
+  });
+
+  it("still replays ordinary Discord replies missed during restart", () => {
+    const messages = [
+      makeMessage({
+        id: "reply-msg",
+        authorId: "user-1",
+        timestampMs: 200,
+        content: "can you look at this?",
+        type: 19,
+      }),
+    ];
+
+    const result = detectMissedMessages({
+      messages,
+      shutdownAt: 100,
+      botId,
+      authorizedSenders,
+    });
+
+    expect(result).toEqual([
+      {
+        id: "reply-msg",
+        content: "can you look at this?",
+        authorId: "user-1",
+        timestampMs: 200,
+      },
+    ]);
   });
 
   it("does not return messages from unauthorized senders", () => {

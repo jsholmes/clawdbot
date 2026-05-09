@@ -7,6 +7,16 @@ export type MissedMessage = {
   timestampMs: number;
 };
 
+// Discord's REST history includes system rows such as ThreadCreated (18) whose
+// `content` is often just the thread title. Replaying those as user prompts
+// routes parent-channel noise into agents during gateway restart recovery.
+// Keep recovery intentionally narrow: ordinary messages plus Discord replies.
+const REPLAYABLE_DISCORD_MESSAGE_TYPES = new Set([0, 19]);
+
+function isReplayableDiscordMessageType(type: number | undefined): boolean {
+  return type === undefined || REPLAYABLE_DISCORD_MESSAGE_TYPES.has(type);
+}
+
 export function detectMissedMessages(params: {
   messages: DiscordMessage[];
   shutdownAt: number;
@@ -37,6 +47,10 @@ export function detectMissedMessages(params: {
     }
 
     if (message.author.bot === true) {
+      continue;
+    }
+
+    if (!isReplayableDiscordMessageType(message.type)) {
       continue;
     }
 

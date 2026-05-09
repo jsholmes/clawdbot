@@ -1,6 +1,7 @@
 export type DiscordMessage = {
   id: string;
   content: string;
+  type?: number;
   attachments?: DiscordAttachment[];
   author: { id: string; bot?: boolean };
   timestamp: string;
@@ -54,8 +55,9 @@ export async function fetchDiscordMessages(
   }
 
   const payload = (await response.json()) as DiscordApiMessage[];
-  return payload.map((message) => ({
-    ...message,
-    timestampMs: Date.parse(message.timestamp),
-  }));
+  return payload.map((message) =>
+    Object.assign(message, {
+      timestampMs: Date.parse(message.timestamp),
+    }),
+  );
 }
