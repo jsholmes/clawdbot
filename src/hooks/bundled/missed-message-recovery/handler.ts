@@ -9,7 +9,46 @@ import { readShutdownState, writeShutdownState } from "./state.js";
 
 const LOG_PREFIX = "[missed-message-recovery]";
 
+export const DEFAULT_MAX_RECOVERY_LOOKBACK_MS = 15 * 60 * 1000;
+
 let shutdownHandlerRegistered = false;
+
+export type RecoveryScanStartDecision = {
+  shutdownAt: number;
+  reason: "force-override" | "stored" | "missing-state" | "stale-state" | "future-state";
+};
+
+export function resolveRecoveryScanStart(params: {
+  forceOverride: string | undefined;
+  storedShutdownAt: number | null;
+  nowMs: number;
+  maxLookbackMs?: number;
+}): RecoveryScanStartDecision {
+  const { forceOverride, storedShutdownAt, nowMs } = params;
+  const maxLookbackMs = params.maxLookbackMs ?? DEFAULT_MAX_RECOVERY_LOOKBACK_MS;
+
+  if (forceOverride !== undefined) {
+    const forced = Number(forceOverride);
+    return {
+      shutdownAt: Number.isFinite(forced) && forced >= 0 ? forced : nowMs,
+      reason: "force-override",
+    };
+  }
+
+  if (storedShutdownAt === null || storedShutdownAt <= 0 || !Number.isFinite(storedShutdownAt)) {
+    return { shutdownAt: nowMs, reason: "missing-state" };
+  }
+
+  if (storedShutdownAt > nowMs) {
+    return { shutdownAt: nowMs, reason: "future-state" };
+  }
+
+  if (nowMs - storedShutdownAt > maxLookbackMs) {
+    return { shutdownAt: nowMs, reason: "stale-state" };
+  }
+
+  return { shutdownAt: storedShutdownAt, reason: "stored" };
+}
 
 function normalizeDiscordBotToken(raw: unknown): string {
   if (typeof raw !== "string") {
@@ -129,21 +168,24 @@ const handleGatewayStartup = async (event: GatewayStartupHookEvent): Promise<voi
     );
   }
 
-  // Allow override for testing: MISSED_RECOVERY_FORCE_SCAN_SINCE=0 scans all history
+  // Allow override for testing: MISSED_RECOVERY_FORCE_SCAN_SINCE=0 scans all history.
   const forceOverride = process.env.MISSED_RECOVERY_FORCE_SCAN_SINCE;
   const storedState = readShutdownState();
-  // If no state file exists or shutdownAt is 0 (e.g. written by a buggy path or missing due to
-  // SIGKILL/OOM), default to "now" so we don't flood every session with old messages.
-  // A shutdownAt of 0 means "no known shutdown time" — treat it as a fresh start.
-  const shutdownAt =
-    forceOverride !== undefined
-      ? Number(forceOverride)
-      : storedState !== null && storedState.shutdownAt > 0
-        ? storedState.shutdownAt
-        : Date.now();
+  const nowMs = Date.now();
+  const scanStart = resolveRecoveryScanStart({
+    forceOverride,
+    storedShutdownAt: storedState?.shutdownAt ?? null,
+    nowMs,
+  });
+  const shutdownAt = scanStart.shutdownAt;
   const sessions = loadAllDiscordSessions();
 
-  console.info(`${LOG_PREFIX} recovery scan: shutdownAt=${shutdownAt}`);
+  console.info(`${LOG_PREFIX} recovery scan: shutdownAt=${shutdownAt} reason=${scanStart.reason}`);
+  if (scanStart.reason === "stale-state") {
+    console.warn(
+      `${LOG_PREFIX} stored shutdownAt is older than ${DEFAULT_MAX_RECOVERY_LOOKBACK_MS}ms; using now to avoid stale replay flood`,
+    );
+  }
 
   // Track whether all sessions were scanned without errors.
   // Only reset shutdownAt on full success — if any channel was skipped,
