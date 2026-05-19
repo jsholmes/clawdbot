@@ -1,7 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { completeSimple } from "@mariozechner/pi-ai";
-import { resolveOpenClawAgentDir } from "../../agents/agent-paths.js";
+import { completeSimple } from "@earendil-works/pi-ai";
 import { getApiKeyForModel } from "../../agents/model-auth.js";
 import { resolveModel } from "../../agents/pi-embedded-runner/model.js";
 import {
@@ -12,6 +11,7 @@ import {
 } from "../../agents/pi-embedded-runner/overflow-recovery.js";
 import { resolveSessionFilePath, resolveSessionFilePathOptions } from "../../config/sessions.js";
 import { resolvePreferredOpenClawTmpDir } from "../../infra/tmp-openclaw-dir.js";
+import { resolveOpenClawAgentDir } from "../../plugin-sdk/agent-dir-compat.js";
 import type { CommandHandler } from "./commands-types.js";
 
 // ---------------------------------------------------------------------------
