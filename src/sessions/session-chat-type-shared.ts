@@ -6,13 +6,10 @@ export type SessionKeyChatType = "direct" | "group" | "channel" | "unknown";
 function deriveBuiltInLegacySessionChatType(
   scopedSessionKey: string,
 ): SessionKeyChatType | undefined {
-  if (/^group:[^:]+$/.test(scopedSessionKey)) {
+  if (/^group:[^:]+$/.test(scopedSessionKey) || scopedSessionKey.includes("@g.us")) {
     return "group";
   }
-  if (/^(?:whatsapp:)?[^:]+@g\.us$/.test(scopedSessionKey)) {
-    return "group";
-  }
-  if (/^discord:(?:[^:]+:)?guild-[^:]+:channel-[^:]+$/.test(scopedSessionKey)) {
+  if (/^discord:guild[^:]*:channel[^:]*$/.test(scopedSessionKey)) {
     return "channel";
   }
   return undefined;

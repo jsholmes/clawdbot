@@ -15,8 +15,8 @@ type WebhookModule = typeof import("../monitor.webhook.js");
 const monitorModuleUrl = new URL("../monitor.ts", import.meta.url).href;
 const secretInputModuleUrl = new URL("../secret-input.ts", import.meta.url).href;
 const webhookModuleUrl = new URL("../monitor.webhook.ts", import.meta.url).href;
-const apiModuleId = new URL("../api.js", import.meta.url).pathname;
-const runtimeModuleId = new URL("../runtime.js", import.meta.url).pathname;
+const apiModuleId = new URL("../api.ts", import.meta.url).href;
+const runtimeModuleId = new URL("../runtime.ts", import.meta.url).href;
 
 type UnknownMock = Mock<(...args: unknown[]) => unknown>;
 type AsyncUnknownMock = Mock<(...args: unknown[]) => Promise<unknown>>;
