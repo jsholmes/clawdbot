@@ -1,8 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { WebSocket } from "ws";
+import {
+  GATEWAY_CLIENT_IDS,
+  GATEWAY_CLIENT_MODES,
+} from "../../../../packages/gateway-protocol/src/client-info.js";
+import { PROTOCOL_VERSION } from "../../../../packages/gateway-protocol/src/version.js";
 import { buildDeviceAuthPayloadV3 } from "../../../gateway/device-auth.js";
-import { GATEWAY_CLIENT_IDS, GATEWAY_CLIENT_MODES } from "../../../gateway/protocol/client-info.js";
-import { PROTOCOL_VERSION } from "../../../gateway/protocol/schema/protocol-schemas.js";
 import { publicKeyRawBase64UrlFromPem, signDevicePayload } from "../../../infra/device-identity.js";
 import { VERSION } from "../../../version.js";
 import {
