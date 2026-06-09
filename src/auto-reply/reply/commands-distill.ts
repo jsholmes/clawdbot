@@ -1,6 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { completeSimple } from "@earendil-works/pi-ai";
+import { completeSimple } from "@openclaw/llm-runtime";
 import { resolveModel } from "../../agents/embedded-agent-runner/model.js";
 import {
   DEFAULT_OVERFLOW_RECOVERY_CONFIG,
